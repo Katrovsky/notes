@@ -12,6 +12,10 @@ HELP
 exit 0
 }
 
+case "${1:-}" in
+  -h|--help) show_help ;;
+esac
+
 [ "${EUID}" -ne 0 ] && echo "Run as root" && exit 1
 [ $# -lt 1 ] && show_help
 
@@ -29,16 +33,13 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-[ -z "$NAME" ] && NAME="$(basename "$EXE")"
+[ -z "$NAME" ] && NAME="$(basename -- "$EXE")"
 DIR="/opt/$NAME"
 SVC="/etc/systemd/system/$NAME.service"
 
 [ ! -f "$EXE" ] && echo "File not found: $EXE" && exit 1
 [ -n "$CFG" ] && [ ! -f "$CFG" ] && echo "Config not found: $CFG" && exit 1
 
-# ---------------------------------------------------------------------------
-# Guard against overwriting an existing service
-# ---------------------------------------------------------------------------
 if [ -f "$SVC" ] || systemctl list-units --full --all | grep -q "^${NAME}.service"; then
     echo "WARNING: Service '$NAME' already exists."
     read -rp "Overwrite? (y/N): " -n 1 REPLY
@@ -48,28 +49,19 @@ if [ -f "$SVC" ] || systemctl list-units --full --all | grep -q "^${NAME}.servic
     systemctl disable "$NAME.service" 2>/dev/null || true
 fi
 
-# ---------------------------------------------------------------------------
-# Dedicated system user
-# ---------------------------------------------------------------------------
 if ! id "$NAME" &>/dev/null; then
     echo "Creating system user '$NAME'..."
     useradd --system --no-create-home --shell /usr/sbin/nologin "$NAME"
 fi
 
-# ---------------------------------------------------------------------------
-# Install files
-# ---------------------------------------------------------------------------
 mkdir -p "$DIR"
 cp "$EXE" "$DIR/"
-chmod +x "$DIR/$(basename "$EXE")"
+chmod +x "$DIR/$(basename -- "$EXE")"
 chown -R "$NAME:$NAME" "$DIR"
 
-[ -n "$CFG" ] && cp "$CFG" "$DIR/" && chown "$NAME:$NAME" "$DIR/$(basename "$CFG")"
+[ -n "$CFG" ] && cp "$CFG" "$DIR/" && chown "$NAME:$NAME" "$DIR/$(basename -- "$CFG")"
 
-# ---------------------------------------------------------------------------
-# Detect shebang to set ExecStart correctly
-# ---------------------------------------------------------------------------
-EXE_BASENAME="$(basename "$EXE")"
+EXE_BASENAME="$(basename -- "$EXE")"
 SHEBANG=$(head -1 "$EXE" | grep '^#!' | sed 's/^#!//' | awk '{print $1}' || true)
 
 if [ -n "$SHEBANG" ] && [ "$SHEBANG" != "/bin/sh" ] && [ "$SHEBANG" != "/bin/bash" ]; then
@@ -79,9 +71,6 @@ else
     EXEC_START="$DIR/$EXE_BASENAME"
 fi
 
-# ---------------------------------------------------------------------------
-# Write service unit
-# ---------------------------------------------------------------------------
 cat > "$SVC" << EOF
 [Unit]
 Description=$NAME service
