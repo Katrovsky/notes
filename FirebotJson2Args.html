@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JSON to Firebot Variable Converter</title>
+    <style>
+      :root {
+        --bg-primary: #f5f5f5;
+        --bg-secondary: #ffffff;
+        --bg-tertiary: #f8f9fa;
+        --text-primary: #000000;
+        --text-secondary: #666666;
+        --border-color: #ddd;
+        --hover-bg: #e3f2fd;
+        --selected-bg: #bbdefb;
+        --valid-color: #4caf50;
+        --invalid-color: #f44336;
+        --shadow: rgba(0, 0, 0, 0.1);
+      }
+
+      [data-theme="dark"] {
+        --bg-primary: #1a1a1a;
+        --bg-secondary: #2d2d2d;
+        --bg-tertiary: #242424;
+        --text-primary: #e0e0e0;
+        --text-secondary: #999999;
+        --border-color: #444;
+        --hover-bg: #1e3a5f;
+        --selected-bg: #2a4a6f;
+        --valid-color: #66bb6a;
+        --invalid-color: #ef5350;
+        --shadow: rgba(0, 0, 0, 0.3);
+      }
+
+      * {
+        transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial,
+          sans-serif;
+        margin: 0;
+        padding: 20px;
+        background-color: var(--bg-primary);
+        color: var(--text-primary);
+      }
+
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 24px;
+      }
+
+      .theme-toggle {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 20px;
+        transition: transform 0.2s;
+      }
+
+      .theme-toggle:hover {
+        transform: scale(1.1);
+      }
+
+      .container {
+        display: flex;
+        gap: 20px;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+      }
+
+      .panel {
+        flex: 1;
+        background: var(--bg-secondary);
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px var(--shadow);
+        display: flex;
+        flex-direction: column;
+        min-height: 80vh;
+        box-sizing: border-box;
+        max-width: 50%;
+      }
+
+      .panel-content {
+        flex: 1;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .input-wrapper {
+        position: relative;
+        margin-bottom: 10px;
+      }
+
+      .validation-indicator {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 20px;
+        pointer-events: none;
+      }
+
+      textarea {
+        width: 100%;
+        height: 400px;
+        padding: 10px;
+        padding-right: 35px;
+        border: 2px solid var(--border-color);
+        border-radius: 6px;
+        font-family: "Consolas", "Monaco", monospace;
+        font-size: 13px;
+        resize: vertical;
+        box-sizing: border-box;
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+      }
+
+      textarea:focus {
+        outline: none;
+        border-color: #2196f3;
+      }
+
+      input {
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 10px;
+        border: 2px solid var(--border-color);
+        border-radius: 6px;
+        box-sizing: border-box;
+        font-family: "Consolas", "Monaco", monospace;
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+        font-size: 14px;
+      }
+
+      input:focus {
+        outline: none;
+        border-color: #2196f3;
+      }
+
+      .result-wrapper {
+        position: relative;
+      }
+
+      .result {
+        background: var(--bg-tertiary);
+        padding: 15px;
+        border-radius: 6px;
+        margin-top: 10px;
+        min-height: 50px;
+        font-family: "Consolas", "Monaco", monospace;
+        word-break: break-all;
+        box-sizing: border-box;
+        border: 2px solid var(--border-color);
+        font-size: 14px;
+      }
+
+      .json-key {
+        cursor: pointer;
+        padding: 4px 6px;
+        margin: 2px 0;
+        border-radius: 4px;
+        transition: all 0.15s;
+        word-break: break-word;
+        overflow-wrap: break-word;
+        display: inline-block;
+      }
+
+      .json-key:hover {
+        background-color: var(--hover-bg);
+        transform: translateX(2px);
+      }
+
+      .json-key.selected {
+        background-color: var(--selected-bg);
+      }
+
+      .json-path-preview {
+        color: var(--text-secondary);
+        font-size: 11px;
+        font-family: "Consolas", "Monaco", monospace;
+        margin-left: 8px;
+        opacity: 0;
+        transition: opacity 0.2s;
+      }
+
+      .json-key:hover .json-path-preview {
+        opacity: 1;
+      }
+
+      .click-hint {
+        color: var(--text-secondary);
+        font-size: 12px;
+        margin-bottom: 10px;
+        padding: 8px;
+        background: var(--bg-tertiary);
+        border-radius: 4px;
+        border-left: 3px solid #2196f3;
+      }
+
+      .collapsible {
+        cursor: pointer;
+        padding: 12px;
+        background-color: var(--bg-tertiary);
+        border: 2px solid var(--border-color);
+        border-radius: 6px;
+        margin-top: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-weight: 500;
+      }
+
+      .collapsible:hover {
+        background-color: var(--hover-bg);
+      }
+
+      .collapsible:after {
+        content: "−";
+        font-weight: bold;
+        font-size: 18px;
+      }
+
+      .collapsible.collapsed:after {
+        content: "+";
+      }
+
+      .collapsible-content {
+        padding: 10px;
+        overflow: auto;
+        flex: 1;
+        border: 2px solid var(--border-color);
+        border-top: none;
+        border-radius: 0 0 6px 6px;
+        height: 400px;
+        box-sizing: border-box;
+        background: var(--bg-secondary);
+      }
+
+      .collapsible-content.collapsed {
+        display: none;
+      }
+
+      .scrollable {
+        overflow: auto;
+        flex: 1;
+      }
+
+      .scrollable::-webkit-scrollbar {
+        width: 10px;
+      }
+
+      .scrollable::-webkit-scrollbar-track {
+        background: var(--bg-tertiary);
+        border-radius: 4px;
+      }
+
+      .scrollable::-webkit-scrollbar-thumb {
+        background: var(--border-color);
+        border-radius: 4px;
+      }
+
+      .scrollable::-webkit-scrollbar-thumb:hover {
+        background: var(--text-secondary);
+      }
+
+      .json-item {
+        margin-left: 24px;
+        word-break: break-word;
+        overflow-wrap: break-word;
+        border-left: 1px solid var(--border-color);
+        padding-left: 8px;
+      }
+
+      .toggle {
+        cursor: pointer;
+        margin-right: 6px;
+        display: inline-block;
+        width: 16px;
+        text-align: center;
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+
+      .type-string {
+        color: #e91e63;
+      }
+      .type-number {
+        color: #2196f3;
+      }
+      .type-boolean {
+        color: #9c27b0;
+      }
+      .type-null {
+        color: #757575;
+      }
+      .type-array {
+        color: #ff9800;
+      }
+      .type-object {
+        color: #4caf50;
+      }
+
+      .copy-notification {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: var(--valid-color);
+        color: white;
+        padding: 12px 20px;
+        border-radius: 6px;
+        z-index: 1000;
+        opacity: 0;
+        transition: opacity 0.3s;
+        box-shadow: 0 4px 12px var(--shadow);
+        font-weight: 500;
+      }
+
+      @media (max-width: 768px) {
+        .container {
+          flex-direction: column;
+        }
+        .panel {
+          max-width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="copy-notification" id="copyNotification">
+      Скопировано в буфер обмена!
+    </div>
+
+    <div class="header">
+      <h1>Конвертер JSON → Firebot переменные</h1>
+      <button class="theme-toggle" id="themeToggle" title="Переключить тему">
+        🌙
+      </button>
+    </div>
+
+    <div class="container">
+      <div class="panel">
+        <div class="panel-content">
+          <h3>1. Введите имя переменной Firebot:</h3>
+          <input
+            type="text"
+            id="varName"
+            placeholder="Например: data, response, myvar"
+            value="httpResponse"
+            autofocus />
+
+          <h3>2. Вставьте JSON:</h3>
+          <div class="input-wrapper">
+            <textarea
+              id="jsonInput"
+              placeholder="Вставьте JSON сюда..."></textarea>
+            <span class="validation-indicator" id="validationIndicator"></span>
+          </div>
+
+          <div class="click-hint">
+            💡 Кликайте по полям JSON справа для быстрого копирования пути
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-content">
+          <div class="collapsible" id="structureCollapsible">
+            3. Структура JSON (кликабельно):
+          </div>
+          <div
+            class="collapsible-content scrollable"
+            id="jsonStructureContainer">
+            <div id="jsonStructure"></div>
+          </div>
+
+          <div class="collapsible" id="resultCollapsible">
+            4. Результат для Firebot:
+          </div>
+          <div class="collapsible-content">
+            <div class="result" id="result">$effectOutput[httpResponse, ]</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const jsonInput = document.getElementById("jsonInput");
+      const varName = document.getElementById("varName");
+      const jsonStructure = document.getElementById("jsonStructure");
+      const result = document.getElementById("result");
+      const validationIndicator = document.getElementById(
+        "validationIndicator"
+      );
+      const structureCollapsible = document.getElementById(
+        "structureCollapsible"
+      );
+      const resultCollapsible = document.getElementById("resultCollapsible");
+      const jsonStructureContainer = document.getElementById(
+        "jsonStructureContainer"
+      );
+      const copyNotification = document.getElementById("copyNotification");
+      const themeToggle = document.getElementById("themeToggle");
+
+      let selectedPath = null;
+      let expandedPaths = new Set();
+
+      const currentTheme = window.matchMedia("(prefers-color-scheme: dark)")
+        .matches
+        ? "dark"
+        : "light";
+      const savedTheme = localStorage.getItem("theme") || currentTheme;
+      document.documentElement.setAttribute("data-theme", savedTheme);
+      themeToggle.textContent = savedTheme === "dark" ? "☀️" : "🌙";
+
+      themeToggle.addEventListener("click", () => {
+        const currentTheme =
+          document.documentElement.getAttribute("data-theme");
+        const newTheme = currentTheme === "dark" ? "light" : "dark";
+        document.documentElement.setAttribute("data-theme", newTheme);
+        localStorage.setItem("theme", newTheme);
+        themeToggle.textContent = newTheme === "dark" ? "☀️" : "🌙";
+      });
+
+      function cleanJsonText(text) {
+        if (!text.trim()) return text;
+
+        const jsonStartIndex = Math.max(text.indexOf("{"), text.indexOf("["));
+
+        if (jsonStartIndex === -1) return text;
+
+        const jsonText = text.substring(jsonStartIndex);
+
+        try {
+          const parsedJSON = JSON.parse(jsonText);
+          return JSON.stringify(parsedJSON, null, 2);
+        } catch (error) {
+          return text;
+        }
+      }
+
+      function showCopyNotification() {
+        copyNotification.style.opacity = "1";
+        setTimeout(() => {
+          copyNotification.style.opacity = "0";
+        }, 2000);
+      }
+
+      function copyToClipboard(text) {
+        navigator.clipboard
+          .writeText(text)
+          .then(() => {
+            showCopyNotification();
+          })
+          .catch(() => {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand("copy");
+            document.body.removeChild(textArea);
+            showCopyNotification();
+          });
+      }
+
+      function getValueType(value) {
+        if (value === null) return "null";
+        if (Array.isArray(value)) return "array";
+        return typeof value;
+      }
+
+      function getTypeIcon(type) {
+        const icons = {
+          string: "📝",
+          number: "🔢",
+          boolean: "✓",
+          null: "∅",
+          array: "📋",
+          object: "📁",
+        };
+        return icons[type] || "•";
+      }
+
+      function renderJSONStructure(obj, path = "") {
+        if (typeof obj !== "object" || obj === null) {
+          const type = getValueType(obj);
+          return `<span class="type-${type}">${obj}</span>`;
+        }
+
+        let html = "<div>";
+        for (const key in obj) {
+          if (obj.hasOwnProperty(key)) {
+            const currentPath = path ? `${path}.${key}` : key;
+            const value = obj[key];
+            const type = getValueType(value);
+            const icon = getTypeIcon(type);
+            const variableName = varName.value.trim() || "var";
+            const isExpanded = expandedPaths.has(currentPath);
+
+            if (Array.isArray(value)) {
+              html += `<div>
+                <span class="toggle" onclick="toggleItem(this, '${currentPath}')">${
+                isExpanded ? "▼" : "▶"
+              }</span>
+                <span class="json-key type-array" data-path="${currentPath}">${icon} ${key} [${
+                value.length
+              }]<span class="json-path-preview">$effectOutput[${variableName}, ${currentPath}]</span></span>
+                <div class="json-item" style="display:${
+                  isExpanded ? "block" : "none"
+                };">${renderJSONStructure(value, currentPath)}</div>
+              </div>`;
+            } else if (typeof value === "object" && value !== null) {
+              html += `<div>
+                <span class="toggle" onclick="toggleItem(this, '${currentPath}')">${
+                isExpanded ? "▼" : "▶"
+              }</span>
+                <span class="json-key type-object" data-path="${currentPath}">${icon} ${key}<span class="json-path-preview">$effectOutput[${variableName}, ${currentPath}]</span></span>
+                <div class="json-item" style="display:${
+                  isExpanded ? "block" : "none"
+                };">${renderJSONStructure(value, currentPath)}</div>
+              </div>`;
+            } else {
+              html += `<div>
+                <span style="width: 16px; display: inline-block;"></span>
+                <span class="json-key type-${type}" data-path="${currentPath}">${icon} ${key}: <span style="color: var(--text-secondary);">${value}</span><span class="json-path-preview">$effectOutput[${variableName}, ${currentPath}]</span></span>
+              </div>`;
+            }
+          }
+        }
+        html += "</div>";
+        return html;
+      }
+
+      function toggleItem(element, path) {
+        const item = element.nextElementSibling.nextElementSibling;
+        if (item.style.display === "none") {
+          item.style.display = "block";
+          element.textContent = "▼";
+          expandedPaths.add(path);
+        } else {
+          item.style.display = "none";
+          element.textContent = "▶";
+          expandedPaths.delete(path);
+        }
+      }
+
+      function updateDisplay() {
+        try {
+          let jsonText = jsonInput.value.trim();
+          const variableName = varName.value.trim();
+
+          if (!jsonText) {
+            jsonStructure.innerHTML =
+              '<div style="color: var(--text-secondary);">Введите JSON для отображения структуры</div>';
+            result.textContent = `$effectOutput[${variableName || "var"}, ]`;
+            validationIndicator.textContent = "";
+            return;
+          }
+
+          const cleanedJson = cleanJsonText(jsonText);
+          if (cleanedJson !== jsonText) {
+            jsonInput.value = cleanedJson;
+            jsonText = cleanedJson;
+          }
+
+          const parsedJSON = JSON.parse(jsonText);
+          validationIndicator.textContent = "✓";
+          validationIndicator.style.color = "var(--valid-color)";
+
+          jsonStructure.innerHTML = renderJSONStructure(parsedJSON);
+
+          if (expandedPaths.size === 0) {
+            document
+              .querySelectorAll("#jsonStructure > div > div > .toggle")
+              .forEach((toggle) => {
+                const path = toggle
+                  .getAttribute("onclick")
+                  .match(/'([^']+)'/)[1];
+                const item = toggle.nextElementSibling.nextElementSibling;
+                item.style.display = "block";
+                toggle.textContent = "▼";
+                expandedPaths.add(path);
+              });
+          }
+
+          document.querySelectorAll(".json-key").forEach((element) => {
+            element.addEventListener("click", function (e) {
+              e.stopPropagation();
+              const path = this.getAttribute("data-path");
+              if (path) {
+                selectedPath = path;
+                const firebotPath = `$effectOutput[${
+                  variableName || "var"
+                }, ${path}]`;
+                result.textContent = firebotPath;
+
+                document.querySelectorAll(".json-key").forEach((el) => {
+                  el.classList.remove("selected");
+                });
+                this.classList.add("selected");
+
+                copyToClipboard(firebotPath);
+              }
+            });
+          });
+        } catch (error) {
+          validationIndicator.textContent = "✗";
+          validationIndicator.style.color = "var(--invalid-color)";
+          jsonStructure.innerHTML = `<div style="color: var(--invalid-color);">Ошибка парсинга JSON: ${error.message}</div>`;
+          result.textContent = "Ошибка в JSON";
+        }
+      }
+
+      function updateResultWithCurrentPath() {
+        if (selectedPath) {
+          const variableName = varName.value.trim() || "var";
+          result.textContent = `$effectOutput[${variableName}, ${selectedPath}]`;
+        } else {
+          const variableName = varName.value.trim() || "var";
+          result.textContent = `$effectOutput[${variableName}, ]`;
+        }
+      }
+
+      result.addEventListener("click", function () {
+        copyToClipboard(result.textContent);
+      });
+      result.style.cursor = "pointer";
+
+      function toggleCollapsible(element, content) {
+        element.classList.toggle("collapsed");
+        content.classList.toggle("collapsed");
+      }
+
+      jsonInput.addEventListener("input", updateDisplay);
+      varName.addEventListener("input", () => {
+        updateDisplay();
+        updateResultWithCurrentPath();
+      });
+
+      structureCollapsible.addEventListener("click", function () {
+        toggleCollapsible(this, jsonStructureContainer);
+      });
+
+      resultCollapsible.addEventListener("click", function () {
+        const resultContent = this.nextElementSibling;
+        toggleCollapsible(this, resultContent);
+      });
+
+      updateDisplay();
+    </script>
+  </body>
+</html>
